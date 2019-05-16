@@ -32,7 +32,7 @@ class InfoService extends Service {
 
   getCirculatingSupply(height) {
     let totalSupply = this.getTotalSupply(height)
-    if (this.app.config.qtum.chain === 'mainnet') {
+    if (this.app.config.htmlcoin.chain === 'mainnet') {
       return totalSupply - 12e6
     } else {
       return totalSupply

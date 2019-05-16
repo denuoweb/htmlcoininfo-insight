@@ -1,17 +1,17 @@
 const path = require('path')
 const _require = require('esm')(module)
 
-const CHAIN = Symbol('qtum.chain')
+const CHAIN = Symbol('htmlcoin.chain')
 
 module.exports = {
   get chain() {
-    this[CHAIN] = this[CHAIN] || this.qtuminfo.lib.Chain.get(this.config.qtum.chain)
+    this[CHAIN] = this[CHAIN] || this.htmlcoininfo.lib.Chain.get(this.config.htmlcoin.chain)
     return this[CHAIN]
   },
-  get qtuminfo() {
+  get htmlcoininfo() {
     return {
-      lib: _require(path.resolve(this.config.qtuminfo.path, 'packages', 'qtuminfo-lib')),
-      rpc: _require(path.resolve(this.config.qtuminfo.path, 'packages', 'qtuminfo-rpc')).default
+      lib: _require(path.resolve(this.config.htmlcoininfo.path, 'packages', 'htmlcoininfo-lib')),
+      rpc: _require(path.resolve(this.config.htmlcoininfo.path, 'packages', 'htmlcoininfo-rpc')).default
     }
   }
 }

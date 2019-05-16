@@ -3,9 +3,9 @@ const {Service} = require('egg')
 class MiscService extends Service {
   async classify(id) {
     const db = this.ctx.model
-    const {Block, Transaction, Contract, Qrc20: QRC20, where, fn, literal} = db
+    const {Block, Transaction, Contract, Hrc20: HRC20, where, fn, literal} = db
     const {or: $or, like: $like} = this.app.Sequelize.Op
-    const {Address} = this.app.qtuminfo.lib
+    const {Address} = this.app.htmlcoininfo.lib
     const {sql} = this.ctx.helper
     const transaction = this.ctx.state.transaction
 
@@ -46,7 +46,7 @@ class MiscService extends Service {
       }
     } catch (err) {}
 
-    let qrc20Results = (await QRC20.findAll({
+    let hrc20Results = (await HRC20.findAll({
       where: {
         [$or]: [
           where(fn('LOWER', fn('CONVERT', literal('name USING utf8mb4'))), id.toLowerCase()),
@@ -55,9 +55,9 @@ class MiscService extends Service {
       },
       attributes: ['contractAddress'],
       transaction
-    })).map(qrc20 => qrc20.contractAddress)
-    if (qrc20Results.length === 0) {
-      qrc20Results = (await QRC20.findAll({
+    })).map(hrc20 => hrc20.contractAddress)
+    if (hrc20Results.length === 0) {
+      hrc20Results = (await HRC20.findAll({
         where: {
           [$or]: [
             where(fn('LOWER', fn('CONVERT', literal('name USING utf8mb4'))), {[$like]: ['', ...id.toLowerCase(), ''].join('%')}),
@@ -68,17 +68,17 @@ class MiscService extends Service {
         },
         attributes: ['contractAddress'],
         transaction
-      })).map(qrc20 => qrc20.contractAddress)
+      })).map(hrc20 => hrc20.contractAddress)
     }
-    if (qrc20Results.length) {
+    if (hrc20Results.length) {
       let [{address, addressHex}] = await db.query(sql`
         SELECT contract.address_string AS address, contract.address AS addressHex FROM (
-          SELECT contract_address, COUNT(*) AS holders FROM qrc20_balance
-          WHERE contract_address IN ${qrc20Results} AND balance != ${Buffer.alloc(32)}
+          SELECT contract_address, COUNT(*) AS holders FROM hrc20_balance
+          WHERE contract_address IN ${hrc20Results} AND balance != ${Buffer.alloc(32)}
           GROUP BY contract_address
           ORDER BY holders DESC LIMIT 1
-        ) qrc20_balance
-        INNER JOIN contract ON contract.address = qrc20_balance.contract_address
+        ) hrc20_balance
+        INNER JOIN contract ON contract.address = hrc20_balance.contract_address
       `, {type: db.QueryTypes.SELECT, transaction})
       return {type: 'contract', address, addressHex: addressHex.toString('hex')}
     }

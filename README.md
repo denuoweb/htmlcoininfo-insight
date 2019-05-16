@@ -7,9 +7,9 @@
 
 ## Table of Contents
 - [ ] [DGP info](#dgpinfo)
-- [x] [QRC20 info](#qrc20-info)
-- [x] [QRC20 transfers](#qrc20-transfers)
-- [x] [QRC20 balances](#qrc20-balances)
+- [x] [HRC20 info](#hrc20-info)
+- [x] [HRC20 transfers](#hrc20-transfers)
+- [x] [HRC20 balances](#hrc20-balances)
 - [ ] [Call Contract](#call-contract)
 
 ### Statistics
@@ -550,7 +550,7 @@ POST response:
   /insight-api/peer
 ```
 
-### Status of the QTUM Network
+### Status of the HTMLCOIN Network
 ```
   /insight-api/status?q=xxx
 ```
@@ -586,22 +586,22 @@ resp:
 }
 ```
 
-### QRC20 info
+### HRC20 info
 ```
   /insight-api/erc20/:contractAddress
   > DEPRECATED
 ```
     
 ```
-  /insight-api/qrc20/:contractAddress
+  /insight-api/hrc20/:contractAddress
 ```
 
-### QRC20 transfers
+### HRC20 transfers
 ```
   /insight-api/erc20/:contractAddress/transfers
 ```
 
-### QRC20 balances
+### HRC20 balances
 ```
   /insight-api/erc20/:contractAddress/balances
 ```

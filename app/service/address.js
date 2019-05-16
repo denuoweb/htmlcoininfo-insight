@@ -3,15 +3,15 @@ const {Service} = require('egg')
 class AddressService extends Service {
   async getAddressSummary(addressIds, p2pkhAddressIds, hexAddresses) {
     const {Block} = this.ctx.model
-    const {balance: balanceService, qrc20: qrc20Service, qrc721: qrc721Service} = this.ctx.service
+    const {balance: balanceService, hrc20: hrc20Service, hrc721: hrc721Service} = this.ctx.service
     const {in: $in, gt: $gt} = this.app.Sequelize.Op
     let [
       {totalReceived, totalSent},
       unconfirmed,
       staking,
       mature,
-      qrc20Balances,
-      qrc721Balances,
+      hrc20Balances,
+      hrc721Balances,
       ranking,
       blocksMined,
       transactionCount
@@ -20,8 +20,8 @@ class AddressService extends Service {
       balanceService.getUnconfirmedBalance(addressIds),
       balanceService.getStakingBalance(addressIds),
       balanceService.getMatureBalance(p2pkhAddressIds),
-      qrc20Service.getAllQRC20Balances(hexAddresses),
-      qrc721Service.getAllQRC721Balances(hexAddresses),
+      hrc20Service.getAllHRC20Balances(hexAddresses),
+      hrc721Service.getAllHRC721Balances(hexAddresses),
       balanceService.getBalanceRanking(addressIds),
       Block.count({where: {minerId: {[$in]: p2pkhAddressIds}, height: {[$gt]: 0}}}),
       this.getAddressTransactionCount(addressIds, hexAddresses),
@@ -33,8 +33,8 @@ class AddressService extends Service {
       unconfirmed,
       staking,
       mature,
-      qrc20Balances,
-      qrc721Balances,
+      hrc20Balances,
+      hrc721Balances,
       ranking,
       transactionCount,
       blocksMined
@@ -42,7 +42,7 @@ class AddressService extends Service {
   }
 
   async getAddressTransactionCount(addressIds, hexAddresses) {
-    const TransferABI = this.app.qtuminfo.lib.Solidity.qrc20ABIs.find(abi => abi.name === 'Transfer')
+    const TransferABI = this.app.htmlcoininfo.lib.Solidity.hrc20ABIs.find(abi => abi.name === 'Transfer')
     const db = this.ctx.model
     const {sql} = this.ctx.helper
     let topics = hexAddresses.map(address => Buffer.concat([Buffer.alloc(12), address]))
@@ -52,12 +52,12 @@ class AddressService extends Service {
         UNION
         SELECT receipt.transaction_id AS transaction_id FROM receipt, receipt_log, contract
         WHERE receipt._id = receipt_log.receipt_id
-          AND contract.address = receipt_log.address AND contract.type IN ('qrc20', 'qrc721')
+          AND contract.address = receipt_log.address AND contract.type IN ('hrc20', 'hrc721')
           AND receipt_log.topic1 = ${TransferABI.id}
           AND (receipt_log.topic2 IN ${topics} OR receipt_log.topic3 IN ${topics})
           AND (
-            (contract.type = 'qrc20' AND receipt_log.topic3 IS NOT NULL AND receipt_log.topic4 IS NULL)
-            OR (contract.type = 'qrc721' AND receipt_log.topic4 IS NOT NULL)
+            (contract.type = 'hrc20' AND receipt_log.topic3 IS NOT NULL AND receipt_log.topic4 IS NULL)
+            OR (contract.type = 'hrc721' AND receipt_log.topic4 IS NOT NULL)
           )
       ) list
     `, {type: db.QueryTypes.SELECT, transaction: this.ctx.state.transaction})
@@ -65,7 +65,7 @@ class AddressService extends Service {
   }
 
   async getAddressTransactions(addressIds, hexAddresses) {
-    const TransferABI = this.app.qtuminfo.lib.Solidity.qrc20ABIs.find(abi => abi.name === 'Transfer')
+    const TransferABI = this.app.htmlcoininfo.lib.Solidity.hrc20ABIs.find(abi => abi.name === 'Transfer')
     const db = this.ctx.model
     const {sql} = this.ctx.helper
     let {limit, offset, reversed = true} = this.ctx.state.pagination
@@ -81,12 +81,12 @@ class AddressService extends Service {
           SELECT receipt.block_height AS block_height, receipt.index_in_block AS index_in_block, receipt.transaction_id AS _id
           FROM receipt, receipt_log, contract
           WHERE receipt._id = receipt_log.receipt_id
-            AND contract.address = receipt_log.address AND contract.type IN ('qrc20', 'qrc721')
+            AND contract.address = receipt_log.address AND contract.type IN ('hrc20', 'hrc721')
             AND receipt_log.topic1 = ${TransferABI.id}
             AND (receipt_log.topic2 IN ${topics} OR receipt_log.topic3 IN ${topics})
             AND (
-              (contract.type = 'qrc20' AND receipt_log.topic3 IS NOT NULL AND receipt_log.topic4 IS NULL)
-              OR (contract.type = 'qrc721' AND receipt_log.topic4 IS NOT NULL)
+              (contract.type = 'hrc20' AND receipt_log.topic3 IS NOT NULL AND receipt_log.topic4 IS NULL)
+              OR (contract.type = 'hrc721' AND receipt_log.topic4 IS NOT NULL)
             )
         ) list
         ORDER BY block_height ${{raw: order}}, index_in_block ${{raw: order}}, _id ${{raw: order}}

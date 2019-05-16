@@ -1,32 +1,32 @@
 const {Service} = require('egg')
 
-class QRC20Service extends Service {
-  async listQRC20Tokens() {
+class HRC20Service extends Service {
+  async listHRC20Tokens() {
     const db = this.ctx.model
     const {sql} = this.ctx.helper
     let {limit, offset} = this.ctx.state.pagination
 
     let result = await db.query(sql`
-      SELECT COUNT(DISTINCT(qrc20_balance.contract_address)) AS count FROM qrc20_balance
-      INNER JOIN qrc20 USING (contract_address)
+      SELECT COUNT(DISTINCT(hrc20_balance.contract_address)) AS count FROM hrc20_balance
+      INNER JOIN hrc20 USING (contract_address)
       WHERE balance != ${Buffer.alloc(32)}
     `, {type: db.QueryTypes.SELECT, transaction: this.ctx.state.transaction})
     let totalCount = result[0].count || 0
     let list = await db.query(sql`
       SELECT
         contract.address_string AS address, contract.address AS addressHex,
-        qrc20.name AS name, qrc20.symbol AS symbol, qrc20.decimals AS decimals, qrc20.total_supply AS totalSupply,
-        qrc20.version AS version,
+        hrc20.name AS name, hrc20.symbol AS symbol, hrc20.decimals AS decimals, hrc20.total_supply AS totalSupply,
+        hrc20.version AS version,
         list.holders AS holders
       FROM (
-        SELECT contract_address, COUNT(*) AS holders FROM qrc20_balance
-        INNER JOIN qrc20 USING (contract_address)
+        SELECT contract_address, COUNT(*) AS holders FROM hrc20_balance
+        INNER JOIN hrc20 USING (contract_address)
         WHERE balance != ${Buffer.alloc(32)}
         GROUP BY contract_address
         ORDER BY holders DESC
         LIMIT ${offset}, ${limit}
       ) list
-      INNER JOIN qrc20 USING (contract_address)
+      INNER JOIN hrc20 USING (contract_address)
       INNER JOIN contract ON contract.address = list.contract_address
     `, {type: db.QueryTypes.SELECT, transaction: this.ctx.state.transaction})
 
@@ -45,13 +45,13 @@ class QRC20Service extends Service {
     }
   }
 
-  async getAllQRC20Balances(hexAddresses) {
+  async getAllHRC20Balances(hexAddresses) {
     if (hexAddresses.length === 0) {
       return []
     }
-    const {Contract, Qrc20: QRC20, Qrc20Balance: QRC20Balance} = this.ctx.model
+    const {Contract, Hrc20: HRC20, Hrc20Balance: HRC20Balance} = this.ctx.model
     const {in: $in} = this.app.Sequelize.Op
-    let list = await QRC20.findAll({
+    let list = await HRC20.findAll({
       attributes: ['contractAddress', 'name', 'symbol', 'decimals'],
       include: [{
         model: Contract,
@@ -59,8 +59,8 @@ class QRC20Service extends Service {
         required: true,
         attributes: ['addressString'],
         include: [{
-          model: QRC20Balance,
-          as: 'qrc20Balances',
+          model: HRC20Balance,
+          as: 'hrc20Balances',
           required: true,
           where: {address: {[$in]: hexAddresses}},
           attributes: ['balance']
@@ -74,20 +74,20 @@ class QRC20Service extends Service {
       name: item.name,
       symbol: item.symbol,
       decimals: item.decimals,
-      balance: item.contract.qrc20Balances.map(({balance}) => balance).reduce((x, y) => x + y)
+      balance: item.contract.hrc20Balances.map(({balance}) => balance).reduce((x, y) => x + y)
     })).filter(({balance}) => balance)
   }
 
-  async getQRC20BalanceHistory(addresses, tokens) {
+  async getHRC20BalanceHistory(addresses, tokens) {
     if (addresses.length === 0 || tokens && tokens.length === 0) {
       return {totalCount: 0, transactions: []}
     }
     let addressSet = new Set(addresses.map(address => address.toString('hex')))
     let topicAddresses = addresses.map(address => Buffer.concat([Buffer.alloc(12), address]))
-    const TransferABI = this.app.qtuminfo.lib.Solidity.qrc20ABIs.find(abi => abi.name === 'Transfer')
+    const TransferABI = this.app.htmlcoininfo.lib.Solidity.hrc20ABIs.find(abi => abi.name === 'Transfer')
     const db = this.ctx.model
     const {sql, sqlRaw} = this.ctx.helper
-    const {Header, Transaction, Receipt, ReceiptLog, Contract, Qrc20: QRC20, Qrc20Balance: QRC20Balance, literal} = db
+    const {Header, Transaction, Receipt, ReceiptLog, Contract, Hrc20: HRC20, Hrc20Balance: HRC20Balance, literal} = db
     const {ne: $ne, and: $and, or: $or, in: $in} = this.app.Sequelize.Op
     let {limit, offset, reversed = true} = this.ctx.state.pagination
     let order = reversed ? 'DESC' : 'ASC'
@@ -101,8 +101,8 @@ class QRC20Service extends Service {
 
     let result = await db.query(sqlRaw`
       SELECT COUNT(DISTINCT(receipt.transaction_id)) AS totalCount
-      FROM receipt, receipt_log, qrc20
-      WHERE receipt._id = receipt_log.receipt_id AND receipt_log.address = qrc20.contract_address AND ${logFilter}
+      FROM receipt, receipt_log, hrc20
+      WHERE receipt._id = receipt_log.receipt_id AND receipt_log.address = hrc20.contract_address AND ${logFilter}
     `, {type: db.QueryTypes.SELECT, transaction: this.ctx.state.transaction})
     let totalCount = result[0].totalCount || 0
     if (totalCount === 0) {
@@ -111,8 +111,8 @@ class QRC20Service extends Service {
     let ids = (await db.query(sqlRaw`
       SELECT transaction_id AS id FROM receipt
       INNER JOIN (
-        SELECT DISTINCT(receipt.transaction_id) AS id FROM receipt, receipt_log, qrc20
-        WHERE receipt._id = receipt_log.receipt_id AND receipt_log.address = qrc20.contract_address AND ${logFilter}
+        SELECT DISTINCT(receipt.transaction_id) AS id FROM receipt, receipt_log, hrc20
+        WHERE receipt._id = receipt_log.receipt_id AND receipt_log.address = hrc20.contract_address AND ${logFilter}
       ) list ON list.id = receipt.transaction_id
       ORDER BY receipt.block_height ${order}, receipt.index_in_block ${order}
       LIMIT ${offset}, ${limit}
@@ -157,8 +157,8 @@ class QRC20Service extends Service {
               attributes: ['addressString']
             },
             {
-              model: QRC20,
-              as: 'qrc20',
+              model: HRC20,
+              as: 'hrc20',
               required: true,
               attributes: ['name', 'symbol', 'decimals']
             }
@@ -174,7 +174,7 @@ class QRC20Service extends Service {
     }
     let initialBalanceMap = new Map()
     if (list.length > 0) {
-      let intialBalanceList = await QRC20Balance.findAll({
+      let intialBalanceList = await HRC20Balance.findAll({
         where: {
           ...tokens ? {contractAddress: {[$in]: tokens}} : {},
           address: {[$in]: addresses}
@@ -264,9 +264,9 @@ class QRC20Service extends Service {
           result.tokens.push({
             address,
             addressHex: log.address,
-            name: log.qrc20.name.toString(),
-            symbol: log.qrc20.symbol.toString(),
-            decimals: log.qrc20.decimals,
+            name: log.hrc20.name.toString(),
+            symbol: log.hrc20.symbol.toString(),
+            decimals: log.hrc20.decimals,
             amount: delta
           })
         }
@@ -285,17 +285,17 @@ class QRC20Service extends Service {
     return {totalCount, transactions}
   }
 
-  async getQRC20TokenRichList(contractAddress) {
+  async getHRC20TokenRichList(contractAddress) {
     const db = this.ctx.model
-    const {Qrc20Balance: QRC20Balance} = db
+    const {Hrc20Balance: HRC20Balance} = db
     const {ne: $ne} = this.app.Sequelize.Op
     let {limit, offset} = this.ctx.state.pagination
 
-    let totalCount = await QRC20Balance.count({
+    let totalCount = await HRC20Balance.count({
       where: {contractAddress, balance: {[$ne]: Buffer.alloc(32)}},
       transaction: this.ctx.state.transaction
     })
-    let list = await QRC20Balance.findAll({
+    let list = await HRC20Balance.findAll({
       where: {contractAddress, balance: {[$ne]: Buffer.alloc(32)}},
       attributes: ['address', 'balance'],
       order: [['balance', 'DESC']],
@@ -320,4 +320,4 @@ class QRC20Service extends Service {
   }
 }
 
-module.exports = QRC20Service
+module.exports = HRC20Service

@@ -2,7 +2,7 @@ const {Service} = require('egg')
 
 class ContractService extends Service {
   async getContractAddresses(list) {
-    const {Address} = this.app.qtuminfo.lib
+    const {Address} = this.app.htmlcoininfo.lib
     const chain = this.app.chain
     const {Contract} = this.ctx.model
 
@@ -34,22 +34,22 @@ class ContractService extends Service {
   }
 
   async getContractSummary(contractAddress, addressIds) {
-    const {Address, Contract, Qrc20: QRC20, Qrc20Balance: QRC20Balance, Qrc721: QRC721} = this.ctx.model
-    const {balance: balanceService, qrc20: qrc20Service, qrc721: qrc721Service} = this.ctx.service
+    const {Address, Contract, Hrc20: HRC20, Hrc20Balance: HRC20Balance, Hrc721: HRC721} = this.ctx.model
+    const {balance: balanceService, hrc20: hrc20Service, hrc721: hrc721Service} = this.ctx.service
     const {ne: $ne} = this.app.Sequelize.Op
     let contract = await Contract.findOne({
       where: {address: contractAddress},
       attributes: ['addressString', 'vm', 'type', 'createTxId', 'createHeight'],
       include: [
         {
-          model: QRC20,
-          as: 'qrc20',
+          model: HRC20,
+          as: 'hrc20',
           required: false,
           attributes: ['name', 'symbol', 'decimals', 'totalSupply', 'version']
         },
         {
-          model: QRC721,
-          as: 'qrc721',
+          model: HRC721,
+          as: 'hrc721',
           required: false,
           attributes: ['name', 'symbol', 'totalSupply']
         },
@@ -62,8 +62,8 @@ class ContractService extends Service {
       ],
       transaction: this.ctx.state.transaction
     })
-    if (contract.type === 'qrc20') {
-      contract.qrc20.holders = await QRC20Balance.count({
+    if (contract.type === 'hrc20') {
+      contract.hrc20.holders = await HRC20Balance.count({
         where: {
           contractAddress,
           address: {[$ne]: Buffer.alloc(20)},
@@ -75,14 +75,14 @@ class ContractService extends Service {
     let [
       {totalReceived, totalSent},
       unconfirmed,
-      qrc20Balances,
-      qrc721Balances,
+      hrc20Balances,
+      hrc721Balances,
       transactionCount
     ] = await Promise.all([
       balanceService.getTotalBalanceChanges(addressIds),
       balanceService.getUnconfirmedBalance(addressIds),
-      qrc20Service.getAllQRC20Balances([contractAddress]),
-      qrc721Service.getAllQRC721Balances([contractAddress]),
+      hrc20Service.getAllHRC20Balances([contractAddress]),
+      hrc721Service.getAllHRC721Balances([contractAddress]),
       this.getContractTransactionCount(contractAddress, addressIds)
     ])
     return {
@@ -93,35 +93,35 @@ class ContractService extends Service {
       owner: contract.owner && contract.owner.string,
       createTxId: contract.createTxId,
       createHeight: contract.createHeight,
-      ...contract.type === 'qrc20' ? {
-        qrc20: {
-          name: contract.qrc20.name,
-          symbol: contract.qrc20.symbol,
-          decimals: contract.qrc20.decimals,
-          totalSupply: contract.qrc20.totalSupply,
-          version: contract.qrc20.version,
-          holders: contract.qrc20.holders
+      ...contract.type === 'hrc20' ? {
+        hrc20: {
+          name: contract.hrc20.name,
+          symbol: contract.hrc20.symbol,
+          decimals: contract.hrc20.decimals,
+          totalSupply: contract.hrc20.totalSupply,
+          version: contract.hrc20.version,
+          holders: contract.hrc20.holders
         }
       } : {},
-      ...contract.type === 'qrc721' ? {
-        qrc721: {
-          name: contract.qrc721.name,
-          symbol: contract.qrc721.symbol,
-          totalSupply: contract.qrc721.totalSupply
+      ...contract.type === 'hrc721' ? {
+        hrc721: {
+          name: contract.hrc721.name,
+          symbol: contract.hrc721.symbol,
+          totalSupply: contract.hrc721.totalSupply
         }
       } : {},
       balance: totalReceived - totalSent,
       totalReceived,
       totalSent,
       unconfirmed,
-      qrc20Balances,
-      qrc721Balances,
+      hrc20Balances,
+      hrc721Balances,
       transactionCount
     }
   }
 
   async getContractTransactionCount(contractAddress, addressIds) {
-    const TransferABI = this.app.qtuminfo.lib.Solidity.qrc20ABIs.find(abi => abi.name === 'Transfer')
+    const TransferABI = this.app.htmlcoininfo.lib.Solidity.hrc20ABIs.find(abi => abi.name === 'Transfer')
     const db = this.ctx.model
     let {sql} = this.ctx.helper
     let topic = Buffer.concat([Buffer.alloc(12), contractAddress])
@@ -136,12 +136,12 @@ class ContractService extends Service {
         UNION
         SELECT receipt.transaction_id AS transaction_id FROM receipt, receipt_log, contract
         WHERE receipt_log.receipt_id = receipt._id
-          AND contract.address = receipt_log.address AND contract.type IN ('qrc20', 'qrc721')
+          AND contract.address = receipt_log.address AND contract.type IN ('hrc20', 'hrc721')
           AND receipt_log.topic1 = ${TransferABI.id}
           AND (receipt_log.topic2 = ${topic} OR receipt_log.topic3 = ${topic})
           AND (
-            (contract.type = 'qrc20' AND receipt_log.topic3 IS NOT NULL AND receipt_log.topic4 IS NULL)
-            OR (contract.type = 'qrc721' AND receipt_log.topic4 IS NOT NULL)
+            (contract.type = 'hrc20' AND receipt_log.topic3 IS NOT NULL AND receipt_log.topic4 IS NULL)
+            OR (contract.type = 'hrc721' AND receipt_log.topic4 IS NOT NULL)
           )
       ) list
     `, {type: db.QueryTypes.SELECT, transaction: this.ctx.state.transaction})
@@ -149,7 +149,7 @@ class ContractService extends Service {
   }
 
   async getContractTransactions(contractAddress, addressIds) {
-    const TransferABI = this.app.qtuminfo.lib.Solidity.qrc20ABIs.find(abi => abi.name === 'Transfer')
+    const TransferABI = this.app.htmlcoininfo.lib.Solidity.hrc20ABIs.find(abi => abi.name === 'Transfer')
     const db = this.ctx.model
     let {sql} = this.ctx.helper
     let {limit, offset, reversed = true} = this.ctx.state.pagination
@@ -170,12 +170,12 @@ class ContractService extends Service {
           SELECT receipt.block_height AS block_height, receipt.index_in_block AS index_in_block, receipt.transaction_id AS _id
           FROM receipt, receipt_log, contract
           WHERE receipt_log.receipt_id = receipt._id
-            AND contract.address = receipt_log.address AND contract.type IN ('qrc20', 'qrc721')
+            AND contract.address = receipt_log.address AND contract.type IN ('hrc20', 'hrc721')
             AND receipt_log.topic1 = ${TransferABI.id}
             AND (receipt_log.topic2 = ${topic} OR receipt_log.topic3 = ${topic})
             AND (
-              (contract.type = 'qrc20' AND receipt_log.topic3 IS NOT NULL AND receipt_log.topic4 IS NULL)
-              OR (contract.type = 'qrc721' AND receipt_log.topic4 IS NOT NULL)
+              (contract.type = 'hrc20' AND receipt_log.topic3 IS NOT NULL AND receipt_log.topic4 IS NULL)
+              OR (contract.type = 'hrc721' AND receipt_log.topic4 IS NOT NULL)
             )
         ) list
         ORDER BY block_height ${{raw: order}}, index_in_block ${{raw: order}}, _id ${{raw: order}}
@@ -320,7 +320,7 @@ class ContractService extends Service {
     }
     const {Contract} = this.ctx.model
     const {in: $in} = this.app.Sequelize.Op
-    const {Address} = this.app.qtuminfo.lib
+    const {Address} = this.app.htmlcoininfo.lib
     let result = addresses.map(address => Buffer.compare(address, Buffer.alloc(20)) === 0 ? null : address)
 
     let contracts = await Contract.findAll({

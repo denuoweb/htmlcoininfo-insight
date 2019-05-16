@@ -1,9 +1,9 @@
 {
-  "name": "qtuminfo-insight",
+  "name": "htmlcoininfo-insight",
   "private": true,
   "scripts": {
-    "start": "egg-scripts start title=qtuminfo-insight --daemon",
-    "stop": "egg-scripts stop title=qtuminfo-insight",
+    "start": "egg-scripts start title=htmlcoininfo-insight --daemon",
+    "stop": "egg-scripts stop title=htmlcoininfo-insight",
     "dev": "egg-bin dev",
     "lint": "eslint --ext .js app config"
   },

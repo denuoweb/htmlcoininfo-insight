@@ -1,6 +1,6 @@
 module.exports = () => async function contract(ctx, next) {
   ctx.assert(ctx.params.contract, 404)
-  const {Address: RawAddress} = ctx.app.qtuminfo.lib
+  const {Address: RawAddress} = ctx.app.htmlcoininfo.lib
   const chain = ctx.app.chain
   const {Address, Contract} = ctx.model
   const {in: $in} = ctx.app.Sequelize.Op

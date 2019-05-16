@@ -1,29 +1,29 @@
 const {Service} = require('egg')
 
-class QRC721Service extends Service {
-  async listQRC721Tokens() {
+class HRC721Service extends Service {
+  async listHRC721Tokens() {
     const db = this.ctx.model
     const {sql} = this.ctx.helper
     let {limit, offset} = this.ctx.state.pagination
 
     let result = await db.query(sql`
-      SELECT COUNT(DISTINCT(qrc721_token.contract_address)) AS count FROM qrc721_token
-      INNER JOIN qrc721 USING (contract_address)
+      SELECT COUNT(DISTINCT(hrc721_token.contract_address)) AS count FROM hrc721_token
+      INNER JOIN hrc721 USING (contract_address)
     `, {type: db.QueryTypes.SELECT, transaction: this.ctx.state.transaction})
     let totalCount = result[0].count || 0
     let list = await db.query(sql`
       SELECT
         contract.address_string AS address, contract.address AS addressHex,
-        qrc721.name AS name, qrc721.symbol AS symbol, qrc721.total_supply AS totalSupply,
+        hrc721.name AS name, hrc721.symbol AS symbol, hrc721.total_supply AS totalSupply,
         list.holders AS holders
       FROM (
-        SELECT contract_address, COUNT(*) AS holders FROM qrc721_token
-        INNER JOIN qrc721 USING (contract_address)
+        SELECT contract_address, COUNT(*) AS holders FROM hrc721_token
+        INNER JOIN hrc721 USING (contract_address)
         GROUP BY contract_address
         ORDER BY holders DESC
         LIMIT ${offset}, ${limit}
       ) list
-      INNER JOIN qrc721 USING (contract_address)
+      INNER JOIN hrc721 USING (contract_address)
       INNER JOIN contract ON contract.address = list.contract_address
     `, {type: db.QueryTypes.SELECT, transaction: this.ctx.state.transaction})
 
@@ -40,7 +40,7 @@ class QRC721Service extends Service {
     }
   }
 
-  async getAllQRC721Balances(hexAddresses) {
+  async getAllHRC721Balances(hexAddresses) {
     if (hexAddresses.length === 0) {
       return []
     }
@@ -49,16 +49,16 @@ class QRC721Service extends Service {
     let list = await db.query(sql`
       SELECT
         contract.address AS addressHex, contract.address_string AS address,
-        qrc721.name AS name,
-        qrc721.symbol AS symbol,
-        qrc721_token.count AS count
+        hrc721.name AS name,
+        hrc721.symbol AS symbol,
+        hrc721_token.count AS count
       FROM (
-        SELECT contract_address, COUNT(*) AS count FROM qrc721_token
+        SELECT contract_address, COUNT(*) AS count FROM hrc721_token
         WHERE holder IN ${hexAddresses}
         GROUP BY contract_address
-      ) qrc721_token
-      INNER JOIN contract ON contract.address = qrc721_token.contract_address
-      INNER JOIN qrc721 ON qrc721.contract_address = qrc721_token.contract_address
+      ) hrc721_token
+      INNER JOIN contract ON contract.address = hrc721_token.contract_address
+      INNER JOIN hrc721 ON hrc721.contract_address = hrc721_token.contract_address
     `, {type: db.QueryTypes.SELECT, transaction: this.ctx.state.transaction})
     return list.map(item => ({
       address: item.address,
@@ -70,4 +70,4 @@ class QRC721Service extends Service {
   }
 }
 
-module.exports = QRC721Service
+module.exports = HRC721Service

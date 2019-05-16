@@ -5,11 +5,11 @@ class TransactionService extends Service {
     const {
       Header, Address,
       Transaction, Witness, TransactionOutput, GasRefund, Receipt, ReceiptLog, ContractSpend,
-      Contract, Qrc20: QRC20, Qrc721: QRC721,
+      Contract, Hrc20: HRC20, Hrc721: HRC721,
       where, col
     } = this.ctx.model
     const {in: $in} = this.app.Sequelize.Op
-    const {Address: RawAddress} = this.app.qtuminfo.lib
+    const {Address: RawAddress} = this.app.htmlcoininfo.lib
 
     let transaction = await Transaction.findOne({
       where: {id},
@@ -135,14 +135,14 @@ class TransactionService extends Service {
             attributes: ['addressString']
           },
           {
-            model: QRC20,
-            as: 'qrc20',
+            model: HRC20,
+            as: 'hrc20',
             required: false,
             attributes: ['name', 'symbol', 'decimals']
           },
           {
-            model: QRC721,
-            as: 'qrc721',
+            model: HRC721,
+            as: 'hrc721',
             required: false,
             attributes: ['name', 'symbol']
           }
@@ -278,17 +278,17 @@ class TransactionService extends Service {
               addressHex: log.address,
               topics: this.transformTopics(log),
               data: log.data,
-              ...log.qrc20 ? {
-                qrc20: {
-                  name: log.qrc20.name,
-                  symbol: log.qrc20.symbol,
-                  decimals: log.qrc20.decimals
+              ...log.hrc20 ? {
+                hrc20: {
+                  name: log.hrc20.name,
+                  symbol: log.hrc20.symbol,
+                  decimals: log.hrc20.decimals
                 }
               } : {},
-              ...log.qrc721 ? {
-                qrc721: {
-                  name: log.qrc721.name,
-                  symbol: log.qrc721.symbol
+              ...log.hrc721 ? {
+                hrc721: {
+                  name: log.hrc721.name,
+                  symbol: log.hrc721.symbol
                 }
               } : {}
             }))
@@ -314,7 +314,7 @@ class TransactionService extends Service {
 
   async getRawTransaction(id) {
     const {Transaction, Witness, TransactionOutput} = this.ctx.model
-    const {Transaction: RawTransaction, Input, Output, Script} = this.app.qtuminfo.lib
+    const {Transaction: RawTransaction, Input, Output, Script} = this.app.htmlcoininfo.lib
 
     let transaction = await Transaction.findOne({
       where: {id},
@@ -406,7 +406,7 @@ class TransactionService extends Service {
   }
 
   async sendRawTransaction(data) {
-    let client = new this.app.qtuminfo.rpc(this.app.config.qtuminfo.rpc)
+    let client = new this.app.htmlcoininfo.rpc(this.app.config.htmlcoininfo.rpc)
     let id = await client.sendrawtransaction(data.toString('hex'))
     return Buffer.from(id, 'hex')
   }
@@ -434,9 +434,9 @@ class TransactionService extends Service {
       : transaction.inputs.map((input, index) => this.transformInput(input, index, {brief}))
     let outputs = transaction.outputs.map((output, index) => this.transformOutput(output, index, {brief}))
 
-    let [qrc20TokenTransfers, qrc721TokenTransfers] = await Promise.all([
-      this.transformQRC20Transfers(transaction.outputs),
-      this.transformQRC721Transfers(transaction.outputs)
+    let [hrc20TokenTransfers, hrc721TokenTransfers] = await Promise.all([
+      this.transformHRC20Transfers(transaction.outputs),
+      this.transformHRC721Transfers(transaction.outputs)
     ])
 
     return {
@@ -476,8 +476,8 @@ class TransactionService extends Service {
           value: output.value.toString()
         }))
       })),
-      qrc20TokenTransfers,
-      qrc721TokenTransfers
+      hrc20TokenTransfers,
+      hrc721TokenTransfers
     }
   }
 
@@ -505,7 +505,7 @@ class TransactionService extends Service {
         index,
         scriptSig: {
           hex: input.scriptSig.toString('hex'),
-          asm: this.app.qtuminfo.lib.Script.fromBuffer(
+          asm: this.app.htmlcoininfo.lib.Script.fromBuffer(
             input.scriptSig,
             {isCoinbase: this.isCoinbase(input), isInput: true}
           ).toString()
@@ -515,7 +515,7 @@ class TransactionService extends Service {
   }
 
   transformOutput(output, index, {brief}) {
-    const {Script} = this.app.qtuminfo.lib
+    const {Script} = this.app.htmlcoininfo.lib
     let scriptPubKey = Script.fromBuffer(output.scriptPubKey, {isOutput: true})
     let type = {
       [Script.UNKNOWN]: 'nonstandard',
@@ -561,20 +561,20 @@ class TransactionService extends Service {
     return result
   }
 
-  async transformQRC20Transfers(outputs) {
-    const TransferABI = this.app.qtuminfo.lib.Solidity.qrc20ABIs.find(abi => abi.name === 'Transfer')
+  async transformHRC20Transfers(outputs) {
+    const TransferABI = this.app.htmlcoininfo.lib.Solidity.hrc20ABIs.find(abi => abi.name === 'Transfer')
     let result = []
     for (let output of outputs) {
       if (output.receipt) {
-        for (let {address, addressHex, topics, data, qrc20} of output.receipt.logs) {
-          if (qrc20 && topics.length === 3 && Buffer.compare(topics[0], TransferABI.id) === 0 && data.length === 32) {
+        for (let {address, addressHex, topics, data, hrc20} of output.receipt.logs) {
+          if (hrc20 && topics.length === 3 && Buffer.compare(topics[0], TransferABI.id) === 0 && data.length === 32) {
             let [from, to] = await this.ctx.service.contract.transformHexAddresses([topics[1].slice(12), topics[2].slice(12)])
             result.push({
               address,
               addressHex: addressHex.toString('hex'),
-              name: qrc20.name,
-              symbol: qrc20.symbol,
-              decimals: qrc20.decimals,
+              name: hrc20.name,
+              symbol: hrc20.symbol,
+              decimals: hrc20.decimals,
               ...from && typeof from === 'object' ? {from: from.string, fromHex: from.hex.toString('hex')} : {from},
               ...to && typeof to === 'object' ? {to: to.string, toHex: to.hex.toString('hex')} : {to},
               value: BigInt(`0x${data.toString('hex')}`).toString()
@@ -586,19 +586,19 @@ class TransactionService extends Service {
     return result
   }
 
-  async transformQRC721Transfers(outputs) {
-    const TransferABI = this.app.qtuminfo.lib.Solidity.qrc20ABIs.find(abi => abi.name === 'Transfer')
+  async transformHRC721Transfers(outputs) {
+    const TransferABI = this.app.htmlcoininfo.lib.Solidity.hrc20ABIs.find(abi => abi.name === 'Transfer')
     let result = []
     for (let output of outputs) {
       if (output.receipt) {
-        for (let {address, addressHex, topics, qrc721} of output.receipt.logs) {
-          if (qrc721 && topics.length === 4 && Buffer.compare(topics[0], TransferABI.id) === 0) {
+        for (let {address, addressHex, topics, hrc721} of output.receipt.logs) {
+          if (hrc721 && topics.length === 4 && Buffer.compare(topics[0], TransferABI.id) === 0) {
             let [from, to] = await this.ctx.service.contract.transformHexAddresses([topics[1].slice(12), topics[2].slice(12)])
             result.push({
               address,
               addressHex: addressHex.toString('hex'),
-              name: qrc721.name,
-              symbol: qrc721.symbol,
+              name: hrc721.name,
+              symbol: hrc721.symbol,
               ...from && typeof from === 'object' ? {from: from.string, fromHex: from.hex.toString('hex')} : {from},
               ...to && typeof to === 'object' ? {to: to.string, toHex: to.hex.toString('hex')} : {to},
               tokenId: topics[3].toString('hex')

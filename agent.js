@@ -6,7 +6,7 @@ module.exports = function(agent) {
   let feeRate = null
 
   agent.messenger.on('egg-ready', () => {
-    let io = SocketClient(`http://localhost:${agent.config.qtuminfo.port}`)
+    let io = SocketClient(`http://localhost:${agent.config.htmlcoininfo.port}`)
     io.on('tip', newTip => {
       tip = newTip
       agent.messenger.sendToApp('block-tip', tip)
@@ -26,7 +26,7 @@ module.exports = function(agent) {
   })
 
   async function fetchFeeRate() {
-    let client = new agent.qtuminfo.rpc(agent.config.qtuminfo.rpc)
+    let client = new agent.htmlcoininfo.rpc(agent.config.htmlcoininfo.rpc)
     let info = await client.estimatesmartfee(10)
     if (info.feerate) {
       feeRate = info.feerate
