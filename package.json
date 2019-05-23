@@ -1,5 +1,6 @@
 {
   "name": "htmlcoininfo-insight",
+  "version": "0.0.0",
   "private": true,
   "scripts": {
     "start": "egg-scripts start title=htmlcoininfo-insight --daemon",
